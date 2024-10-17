@@ -75,5 +75,5 @@ if __name__ == '__main__':
     report_processor = ReportProcessor()
     report_processor.process_report()
 
-    unique_positions_writer = UniquePositionsWriter(report_processor.get_unique_positions())
-    unique_positions_writer.write_unique_positions()
+    # unique_positions_writer = UniquePositionsWriter(report_processor.get_unique_positions())
+    # unique_positions_writer.write_unique_positions()
