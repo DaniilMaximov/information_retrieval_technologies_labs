@@ -2,3 +2,13 @@ urllib3
 beautifulsoup4
 lxml
 matplotlib
+beautifulsoup4
+matplotlib
+numpy
+pandas
+lxml
+nltk
+pymystem3
+pymorphy3
+scikit-learn
+gensim
