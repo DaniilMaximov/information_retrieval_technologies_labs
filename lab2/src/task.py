@@ -15,80 +15,78 @@ from sklearn.metrics.pairwise import cosine_similarity
 from gensim import corpora
 from gensim.models import LdaModel
 
-# Download Russian stopwords
+# Загрузка русских стоп-слов
 nltk.download('stopwords')
 russian_stopwords = set(stopwords.words('russian'))
 
-# Initialize tools
+# Инициализация инструментов
 mystem = Mystem()
 morph = MorphAnalyzer()
 
 
-# ------------- UTILITY FUNCTIONS ------------- #
+# -------------------------- #
 
 def clean_html(raw_html):
-    """Remove HTML tags."""
+    """Удаление HTML-тегов."""
     soup = BeautifulSoup(raw_html, 'html.parser')
     return soup.get_text()
 
 
 def remove_punctuation(text):
-    """Remove punctuation and numbers."""
+    """Удаление пунктуации и цифр."""
     return re.sub(r'[^a-zA-Zа-яА-ЯёЁ\s]', '', text)
 
 
 def lemmatize_with_mystem(text):
-    """Lemmatize text using pymystem3."""
+    """Лемматизация текста с использованием pymystem3."""
     lemmas = mystem.lemmatize(text)
     return ''.join(lemmas).strip()
 
 
 def lemmatize_with_pymorphy(text):
-    """Lemmatize text using pymorphy3."""
+    """Лемматизация текста с использованием pymorphy3."""
     return ' '.join([morph.parse(word)[0].normal_form for word in text.split()])
 
 
 def calculate_stopwords(text):
-    """Calculate the number of stopwords in a text."""
+    """Подсчет количества стоп-слов в тексте."""
     words = text.split()
     return sum(1 for word in words if word in russian_stopwords)
 
 
 def latin_ratio(text):
-    """Calculate the ratio of Latin words."""
+    """Подсчет доли латинских слов в тексте."""
     latin_count = sum(1 for word in text.split() if re.match(r'[a-zA-Z]+', word))
     return latin_count / len(text.split()) if len(text.split()) > 0 else 0
 
 
-# ------------- MAIN FUNCTIONS ------------- #
+# -------------------------- #
 
 def decode_bz2_files(input_path, output_path):
-    """Decode and decompress .bz2 files to .xml."""
+    """Декодирование и разархивация файлов .bz2 в .xml."""
     os.makedirs(output_path, exist_ok=True)
     bz2_files = [file for file in os.listdir(input_path) if file.endswith('.bz2')]
 
-    for bz2_file in bz2_files[:3]:  # Process only the first 3 files
+    for bz2_file in bz2_files[:3]:
         bz2_file_path = os.path.join(input_path, bz2_file)
 
-        # Read the compressed file
         with open(bz2_file_path, 'rb') as f:
             encoded_data = f.read()
 
-        # Attempt to decompress the file
         try:
             decompressed_data = bz2.decompress(encoded_data)
         except OSError:
-            print(f"Error decompressing {bz2_file}")
+            print(f"Ошибка разархивации {bz2_file}")
             continue
 
-        # Decode the content
+        # Декодирование содержимого
         try:
             xml_content = decompressed_data.decode('cp1251')
         except UnicodeDecodeError:
-            print(f"Error decoding {bz2_file}")
+            print(f"Ошибка декодирования {bz2_file}")
             continue
 
-        # Remove collection-description
+        # Удаление описания коллекции
         xml_content = re.sub(
             r'<collection-description>.*?</collection-description>',
             '',
@@ -96,15 +94,15 @@ def decode_bz2_files(input_path, output_path):
             flags=re.DOTALL
         )
 
-        # Save the decompressed and cleaned XML file
+        # Сохранение декомпрессированного файла XML
         xml_file_name = bz2_file.replace('.bz2', '.xml')
         with open(os.path.join(output_path, xml_file_name), 'w', encoding='utf-8') as xml_file:
             xml_file.write(xml_content)
-        print(f"File {xml_file_name} successfully decompressed and decoded.")
+        print(f"Файл {xml_file_name} успешно разархивирован и декодирован.")
 
 
 def process_xml_file(file_path):
-    """Parse and clean XML documents."""
+    """Парсинг и обработка XML документов."""
     tree = ET.parse(file_path)
     root = tree.getroot()
     documents = []
@@ -132,40 +130,35 @@ def process_xml_file(file_path):
 
 
 def process_decoded_files(decoded_path):
-    """Process decompressed XML files into a DataFrame."""
+    """Обработка декомпрессированных файлов XML в DataFrame."""
     files = [f for f in os.listdir(decoded_path) if f.endswith('.xml')]
     all_documents = []
 
     for file in files:
         file_path = os.path.join(decoded_path, file)
-        print(f"Processing file: {file}")
+        print(f"Обработка файла: {file}")
         all_documents.extend(process_xml_file(file_path))
 
     df = pd.DataFrame(all_documents)
-    print(f"Processed {len(all_documents)} documents.")
+    print(f"Обработано {len(all_documents)} документов.")
     return df
 
 
 def analyze_documents(df):
-    """Perform analysis on the document DataFrame."""
-    # Combine subject and content
+    """Анализ DataFrame с документами."""
     df["full_doc"] = df['subject'] + " " + df['content']
 
-    # Lowercase and remove punctuation
     df['doc_lower'] = df['full_doc'].str.lower().apply(remove_punctuation)
 
-    # Lemmatize text
     df['mystem'] = df['doc_lower'].apply(lemmatize_with_mystem)
     df['pymorphy'] = df['doc_lower'].apply(lemmatize_with_pymorphy)
 
-    # Calculate additional metrics
     df['stopword_ratio'] = df['doc_lower'].apply(calculate_stopwords) / df['doc_lower'].str.split().apply(len)
     df['avg_word_len'] = df['doc_lower'].apply(
         lambda text: sum(len(word) for word in text.split()) / len(text.split()) if len(text.split()) > 0 else 0
     )
     df['latin_ratio'] = df['doc_lower'].apply(latin_ratio)
 
-    # Document length stats
     df['doc_len_words'] = df['full_doc'].apply(lambda x: len(x.split()))
     df['doc_len_bytes'] = df['full_doc'].apply(lambda x: len(x.encode('utf-8')))
 
@@ -175,12 +168,11 @@ def analyze_documents(df):
     print(f"Средняя длина слова: {df['avg_word_len'].mean()}")
     print(f"Доля слов, написанных латиницей: {df['latin_ratio'].mean()}")
 
-    # Plotting document length distributions
     analyze_document_lengths(df)
 
 
 def analyze_document_lengths(df):
-    """Plot document length distributions."""
+    """Визуализация распределения длины документов."""
     all_docs_len = df['doc_len_words'].tolist()
     all_docs_len_byte = df['doc_len_bytes'].tolist()
     clip_all_docs_len = [num if num <= 1000 else 1000 for num in all_docs_len]
@@ -211,12 +203,11 @@ def analyze_document_lengths(df):
 
 
 def build_tfidf_model(df):
-    """Build TF-IDF model and add a search function."""
+    """Построение TF-IDF модели."""
     tfidf_vectorizer = TfidfVectorizer()
     tfidf_matrix = tfidf_vectorizer.fit_transform(df['mystem'])
 
     def search_query(query, top_n=3):
-        """Search documents based on a query."""
         query = lemmatize_with_mystem(remove_punctuation(query.lower()))
         query_vec = tfidf_vectorizer.transform([query])
         cosine_similarities = cosine_similarity(query_vec, tfidf_matrix).flatten()
@@ -229,7 +220,7 @@ def build_tfidf_model(df):
 
 
 def build_lda_model(df):
-    """Build LDA topic model."""
+    """Построение LDA модели."""
     texts = df["mystem"].apply(str.split).tolist()
     dictionary = corpora.Dictionary(texts)
     corpus = [dictionary.doc2bow(text) for text in texts]
@@ -241,26 +232,26 @@ def build_lda_model(df):
     return lda_model
 
 
-# ------------- SCRIPT EXECUTION ------------- #
+# -------------------------- #
 
 if __name__ == "__main__":
-    # Paths
+    # Пути к файлам
     input_path = './news2006'
     output_path = './news2006_decoded'
 
-    # Step 1: Decode and decompress .bz2 files
+    # 1 Разархивация
     decode_bz2_files(input_path, output_path)
 
-    # Step 2: Process decompressed XML files
+    # 2 Расшифровка
     df = process_decoded_files(output_path)
 
-    # Step 3: Analyze documents
+    # 3: Анализ документа
     analyze_documents(df)
 
-    # Step 4: Build models
+    # 4 tfidf и lda
     search = build_tfidf_model(df)
     lda_model = build_lda_model(df)
 
-    # Example queries
-    print("\nSearching for 'выборы':")
+    # Пример запросов
+    print("\nПоиск по запросу 'выборы':")
     search("выборы")
