@@ -12,3 +12,4 @@ pymystem3
 pymorphy3
 scikit-learn
 gensim
+navec

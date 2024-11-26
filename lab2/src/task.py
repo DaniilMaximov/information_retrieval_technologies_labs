@@ -245,7 +245,7 @@ if __name__ == "__main__":
     # 2 Расшифровка
     df = process_decoded_files(output_path)
 
-    # 3: Анализ документа
+    # 3: Анализ документов
     analyze_documents(df)
 
     # 4 tfidf и lda
